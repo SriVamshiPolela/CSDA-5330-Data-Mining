@@ -1,0 +1,263 @@
+#Question 1:
+**********************************************************************************************
+library(rpart)
+library(caret)
+library(rpart.plot)
+
+# a.	Load the bostonhousing.csv into RStudio.
+BostonHousing.df = read.csv("boston-housing-classification.csv")
+
+#b.	Explore data. 
+#i.	How many rows of data do we have?
+nrow(BostonHousing.df)
+#ii.	How many attributes?
+colnames(BostonHousing.df)
+# Check the target attribute
+head(BostonHousing.df$MEDV_CAT)
+# basic stats
+summary(BostonHousing.df)
+
+#c.	Apply classification trees to the MEDV_CAT 
+BostonHousing.df.tree = rpart(MEDV_CAT~., data=BostonHousing.df, method = "class")
+prp(BostonHousing.df.tree, type = 2, extra = 104, nn = TRUE, fallen.leaves = TRUE, faclen = 4, varlen = 8, shadow.col = "green")
+
+# d.	Compute the a-priori (prior probability of each class) probabilities in the data file. 
+# Calculate the count of each class
+class_counts = table(BostonHousing.df$MEDV_CAT)
+class_counts
+# Calculate the total number of instances
+total_instances = sum(class_counts)
+total_instances
+# Compute the a-priori probabilities
+prior_probabilities = class_counts / total_instances
+prior_probabilities
+
+set.seed(2021)
+BostonHousing_partition = createDataPartition(BostonHousing.df$MEDV_CAT, p=0.7, list=FALSE)
+train.df = BostonHousing.df[BostonHousing_partition,]
+test.df = BostonHousing.df[-BostonHousing_partition,]
+head(train.df)
+head(test.df)
+
+
+# f.	Build the tree model. Ignore minisplit, use minibucket = 10 and cp = 0
+BostonHousing.df.tree1 = rpart(MEDV_CAT~., data=train.df, method = "class", control = rpart.control(minbucket = 10, cp = 0))
+prp(BostonHousing.df.tree1, type = 2, extra = 104, nn = TRUE, fallen.leaves = TRUE, faclen = 4, varlen = 8, shadow.col = "green")
+
+# Interpret the root and the level 1 nodes
+# Here the only column used "LSTAT" , 48% of observations are satified as high and 52% as low
+
+# h.	Evaluating the tree by creating confusion matrix of the training and test datasets. 
+
+predict_train= predict(BostonHousing.df.tree1, train.df, type="class")
+head(predict_train)
+
+# Check the predicted attribute level and actual attribute level and create a confusion matrix on train data
+train.df$MEDV_CAT <- factor(train.df$MEDV_CAT, levels = c("High", "Low"))
+levels(predict_train)
+levels(train.df$MEDV_CAT)
+CM_train = confusionMatrix(predict_train, train.df$MEDV_CAT)
+CM_train
+
+# Predicting on test data
+predict_test= predict(BostonHousing.df.tree1, test.df, type="class")
+head(predict_test)
+
+# Check the predicted attribute level and actual attribute level and create a confusion matrix on test data
+test.df$MEDV_CAT <- factor(test.df$MEDV_CAT, levels = c("High", "Low"))
+levels(predict_test)
+levels(test.df$MEDV_CAT)
+
+CM_test = confusionMatrix(predict_test, test.df$MEDV_CAT)
+CM_test
+
+
+# i.	Rebuild the tree on training dataset. Ignore minibucket, use minisplit = 10 and cp = 0.
+BostonHousing.df.tree2 = rpart(MEDV_CAT~., data = train.df, control = rpart.control(minsplit = 10, cp=0), method = "class")
+# Create a new tree graph
+prp(BostonHousing.df.tree2, type = 2, extra = 104, nn = TRUE, fallen.leaves = TRUE, faclen = 4, varlen = 8, col = "darkblue", shadow.col = "yellow")
+
+# k.	Plot the CP graph of the new tree model. 
+plotcp(BostonHousing.df.tree2)
+printcp(BostonHousing.df.tree2)
+best_cp <- BostonHousing.df.tree2$cptable[which.min(BostonHousing.df.tree2$cptable[, "xerror"]),"CP"]
+# What value of the CP gives the best tree model?
+# The cp value is 0.13 by graph and accuracy is 87%
+# but the accuracy is increased by 3% (i.e., 90%) when i used cp = 0.02 
+
+# l.	Prune the tree with the best CP value.
+BostonHousing.df.tree2.prune = prune(BostonHousing.df.tree2, cp = 0.02)
+# m.	Create the graph of the pruned tree. 
+prp(BostonHousing.df.tree2.prune, type = 2, extra = 104, nn = TRUE, fallen.leaves = TRUE, faclen = 4, varlen = 8, col = "darkblue", shadow.col = "yellow")
+
+# n.	Apply the pruned tree model on the test dataset. Evaluate the confusion matrix of result.
+predict_test2 = predict(BostonHousing.df.tree2.prune, test.df, type = "class")
+head(predict_test2)
+
+CM_test.prune = confusionMatrix(predict_test2, test.df$MEDV_CAT)
+CM_test.prune
+
+**************************************************************************************************
+#Question 2:
+# Libraries needed
+library(caret)
+library(tidyverse)
+
+# read the UniversalBank.csv 
+UnvBank = read.csv("UniversalBank.csv ")
+
+# Explore the dataset
+head(UnvBank)
+
+# Get th stats
+summary(UnvBank)
+# drop the irrelevant attributes
+UnvBank <- UnvBank[, !(names(UnvBank) %in% c("ID", "ZIP.Code"))]
+colnames(UnvBank)
+
+# Check the Education attribute
+unique(UnvBank$Education)
+# Convert the education attribute into categorical format using factor
+UnvBank$Education = factor(UnvBank$Education, levels = c(1,2,3), labels = c("Undergrad","Graduate","Advanced/Professional"))
+levels(UnvBank$Education)
+
+# Check the target attribute personal Loan
+unique(UnvBank$Personal.Loan) # convert the personal loan attribute into categorical format
+
+UnvBank$Personal.Loan = factor(UnvBank$Personal.Loan, levels = c(0,1), labels = c("No","Yes"))
+levels(UnvBank$Personal.Loan)
+
+# partition the data
+set.seed(2023)
+Bank_data_partition = createDataPartition(UnvBank$Personal.Loan, p=0.6, list = FALSE)
+train.df = UnvBank[Bank_data_partition,]
+test.df = UnvBank[-Bank_data_partition,]
+
+# Apply logistic regression model
+logit.model = glm(train.df$Personal.Loan~., data = train.df, family = "binomial")
+summary(logit.model)
+
+# Apply the model on test data
+PersonalLoan_predicted = predict(logit.model, test.df, type = "response")
+test.df$Predicted_loan1 = PersonalLoan_predicted
+head(test.df)
+
+# e.	What attributes are non-significant. 
+# Age, Experience and Mortgage 
+
+# g.	Rebuild the model with only with significant attributes.
+logit.model.new = glm(train.df$Personal.Loan ~ Income + Family + CCAvg + Education + Securities.Account + CD.Account + Online + CreditCard,
+                       data = train.df, family = "binomial")
+summary(logit.model.new)
+
+# h.	Apply the model on the validation set. 
+PersonalLoan_predicted_Significant = predict(logit.model.new, test.df, type = "response")
+test.df$Predicted_loan2 = PersonalLoan_predicted_Significant
+head(test.df)
+
+test.df$predictions <- ifelse(test.df$Predicted_loan2 >= 0.5, "Yes", "No")
+
+test.df$predictions <- factor(test.df$predictions)
+head(test.df$predictions)
+
+head(test.df)
+
+# i.	Build the validation dataset confusion matrix with 50% cutoff.
+
+CM_test = confusionMatrix(test.df$predictions, test.df$Personal.Loan)
+CM_test
+
+test.df
+
+
+# Write the data frame to a CSV file
+write.csv(test.df, file = "TestPredictions.csv", row.names = FALSE)
+
+*******************************************************************************************************
+# Question 3:
+# Read data from mlba package
+RidingMowers.df= mlba::RidingMowers
+
+
+head(RidingMowers.df)
+view(RidingMowers.df)
+
+# a. What percentage of households in the study were owners of a riding mower?
+n = count(RidingMowers.df) # Total no of rows
+Total_RidingMowers_Owner = sum(RidingMowers.df$Ownership == "Owner")
+percentage_owners = (Total_RidingMowers_Owner / n) * 100
+print(percentage_owners)
+
+# Create a scatter plot of Income vs. Lot Size using color or symbol to distinguish owners from nonowners.
+library(ggplot2)
+
+# Create the scatter plot
+ggplot(RidingMowers.df, aes(x = Income, y = Lot_Size, color = Ownership)) +
+  geom_point() +
+  labs(title = "Scatter Plot of Income vs. Lot Size by Ownership") +
+  scale_color_manual(values = c("Owner" = "blue", "Nonowner" = "red"))
+
+# From the scatter plot, which class seems to have a higher average income, owners or nonowners?
+# Calculate the mean income for owners and non-owners
+mean_income_by_ownership <- aggregate(Income ~ Ownership, data = RidingMowers.df, FUN = mean)
+
+# Print the mean income for each class
+print(mean_income_by_ownership)
+
+# use factor before applying the model
+RidingMowers.df$Ownership = factor(RidingMowers.df$Ownership)
+
+# Apply logistic Regression on this data where target attribute is Ownership
+Riding_LR_Model = glm(RidingMowers.df$Ownership~., data= RidingMowers.df, family = "binomial")
+
+summary(Riding_LR_Model)
+# Applying the model on test data
+Model_Predictions = predict(Riding_LR_Model, data = RidingMowers.df, type = "response")
+Model_Predictions
+
+# Set the cutoff 50% 
+RidingMowers.df$Predictions<- ifelse(Model_Predictions>= 0.5, "Owner", "Nonowner")
+print(RidingMowers.df)
+
+# Check the levels 
+levels(RidingMowers.df$Ownership)
+levels(RidingMowers.df$Predictions)
+# convert the predictions to categorical using factor
+RidingMowers.df$Predictions = factor(RidingMowers.df$Predictions)
+levels(RidingMowers.df$Predictions)
+
+confusionMatrix(RidingMowers.df$Predictions, RidingMowers.df$Ownership)
+
+# c. Among nonowners, what is the percentage of households classified correctly?
+# based on confusion matrix, percentage is 83%
+
+# d. To increase the percentage of correctly classified nonowners, should the threshold probability be increased or decreased?
+#By decreasing the threshold probability, you will classify more observations as "Nonowner" (including some that were previously classified as "Owner"), which can potentially increase the number of True Negatives (TN). 
+#This will increase the percentage of correctly classified non-owners.
+
+# e. What are the odds that a household with a $60K income and a lot size of 20,000 ft2 is an owner?
+# Given Input values
+income = 60
+lotsize=20
+# Create a data frame with the input values
+new_data <- data.frame(Income = income, Lot_Size = lotsize)
+
+Probability_newdata = predict(Riding_LR_Model, new_data, type = "response")
+Probability_newdata
+
+# Calculate the odds for Y= Owner
+odds = Probability_newdata / (1 - Probability_newdata)
+odds
+
+# f)	What is the classification of a household with a $60K income and a lot size of 20,000 ft 2? Use threshold = 0.5.
+
+# Classify based on the threshold
+classification <- ifelse(Probability_newdata >= 0.5, "Owner", "Non-Owner")
+classification
+
+
+# Classified as nonowner
+
+
+
+
