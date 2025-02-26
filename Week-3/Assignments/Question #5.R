@@ -1,0 +1,81 @@
+library(arules)
+library(arulesViz)
+library(caret)
+# Read the BostonHousing dataset which is in mlba package
+BostonHousing.df<-mlba::BostonHousing
+# Display the first 6 rows of the dataset
+head(BostonHousing.df)
+# Setting the seed value to 2023, means fixing the starting point for the random number generator
+set.seed(2023)
+
+#****************************************************************************************
+# B. Applying the regression model after divinding the dataset into training and holdout sets
+
+# createDataPartition function is used to create a data partition based on the specified parameters.
+# here p=0.7 parameter specifies that you want to allocate 70 percent of the data to the training set, and the remaining 30 percent will be allocated to the holdout set (testing set). 
+idx<-caret::createDataPartition(BostonHousing.df$MEDV, p=0.7, list=FALSE)#Here List=FLASE will gives the result in the form of vector of indices rather than a list of data frames
+# Training set 
+train.df<- BostonHousing.df[idx,]
+head(train.df)
+# Holdout set 
+holdout.df<-BostonHousing.df[-idx,]
+head(holdout.df)
+
+# Applying the regression model
+BostonHousing_Reg<-lm(train.df$MEDV ~ CRIM+CHAS+RM, data = train.df)
+summary(BostonHousing_Reg)
+
+# This will give us the predicted values
+predict_train<-predict(BostonHousing_Reg)
+predict_holdout<-predict(BostonHousing_Reg, newdata=holdout.df)
+
+## Evaluate model performance using Root Mean Squared Error (RMSE)
+# RMSE for the training set
+caret::RMSE(predict_train, train.df$MEDV)
+
+# RMSE for the holdout set
+caret::RMSE(predict_holdout, holdout.df$MEDV)
+
+rbind(
+  Training=mlba::regressionSummary(predict_train, train.df$MEDV),
+  Holdout=mlba::regressionSummary(predict_holdout, holdout.df$MEDV)
+)
+
+# C. Create a data frame with the predictor variable values
+data1 <- data.frame(CRIM = 0.1, CHAS = 0, RM = 6)
+
+# Use the predict() function to make the prediction
+predicted_price <- predict(BostonHousing_Reg, newdata = data1)
+
+# Display the predicted median house price
+print(predicted_price)
+
+
+# for producing a graphical display of a correlation matrix
+install.packages("corrgram")
+library(corrgram)
+# arranging multiple graphs
+install.packages("gridExtra")
+library(gridExtra)
+
+#D. Creating a correlation matrix of INDUS, NOX, and TAX. 
+CorrelationMatrix<-cor(BostonHousing.df[, c("INDUS", "NOX", "TAX")])
+print(CorrelationMatrix) #The correlation matrix shows that industrial land use (INDUS) is positively correlated with air pollution (NOX) and property tax rates (TAX), while air pollution and property tax rates are also positively correlated.
+
+# E. Creating a Correlation Matrix and identify correlated predictors 
+CorrelationMatrix2<-cor(BostonHousing.df[, !names(BostonHousing.df) %in% c("CHAS")])
+highly_correlated_pairs <- which(CorrelationMatrix2 > 0.7 & CorrelationMatrix2 < 1, arr.ind = TRUE)
+print(CorrelationMatrix2)
+print(highly_correlated_pairs)
+
+# F. Get the training set and remove the attributes CHAS, INDUS, and AGE
+train.df1 <- train.df[, !names(BostonHousing.df) %in% c("CHAS", "INDUS", "AGE")]
+Regeression_model<-lm(train.df1$MEDV ~ ., data=train.df1)
+summary(Regeression_model)
+
+# G. Run the model on holdout and display the accuracy.
+holdout.df1<-holdout.df[, !names(BostonHousing.df) %in% c("CHAS", "INDUS", "AGE")]
+predicted_values <- predict(Regeression_model, newdata = holdout.df1)
+# Calculate the RMSE
+Accuracy=caret::RMSE(predicted_values, holdout.df1$MEDV)
+print(Accuracy)

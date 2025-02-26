@@ -1,0 +1,48 @@
+install.packages("arules")
+library(arules)
+
+a) Read the data set. What is the type of the dataset?
+basket <- read.transactions("market.csv", sep = ",")
+class(basket)
+# The type of data is [1] "transactions" attr(,"package") 
+
+c)Apply the algorithm with no parameter specified. Interpret the results
+No_Parameter <- apriori(basket)
+print(No_Parameter)
+summary(No_Parameter)
+
+d)Apply the algorithm with the following parameters.
+(List support = 0.006, confidence = 0.25, minlen = 2) and prepare a summary of result
+
+Parameters <- apriori(basket , parameter = list(support = 0.006, confidence = 0.25, minlen = 2))
+print(Parameters)
+summary(Parameters)
+
+e)Visualization of the rules. Interpret the visualization
+
+install.packages("arulesViz")
+library(arulesViz)
+install.packages("colorspace")
+library(colorspace)
+plot(Parameters, control = list(col=sequential_hcl(1000)))
+plot(Parameters, col=sequential_hcl(1000))
+plot(Parameters, method = "graph", engine = "htmlwidget")
+plot(Parameters , method = "two-key plot")
+plot(Parameters , method = "matrix")
+
+f)Find subsets of rules containing any berry items
+berrybasket <- subset(basket, items %in% "berries")
+inspect(berrybasket)
+
+g)Visualization of the berry rules. Interpret the visualization
+
+plot(berrybasket , method = "matrix")
+
+h)Inspect the lift values.
+
+inspect(sort(Parameters, by = "lift")[1:16])
+
+i) writing the rules to a CSV file. Call this file “basketrules.csv”
+
+write(Parameters, file = "groceryrules.csv",
+- [ ]       sep = ",", quote = TRUE, row.names = FALSE)

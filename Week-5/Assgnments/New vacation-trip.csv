@@ -1,0 +1,9 @@
+Income,Family_size,Predicted_Result
+90000,3,Non-buyer
+105000,2,Buyer
+70000,1,Non-buyer
+119000,2,Buyer
+130000,4,Buyer
+132000,5,Buyer
+90000,3,Non-buyer
+80000,0,Non-buyer

@@ -1,0 +1,120 @@
+###########################################################################
+#4. a)	Get Items frequency
+###########################################################################
+#loading csv file into R
+course_topics <- read.csv("Coursetopics.csv")
+
+#frequency of all items in course_topics can be done using multiple ways like using table(), using tabulate(),
+#Using count() from plyr package, Using vctrs package, getting values into a dataframe, using aggregate
+
+table(course_topics)
+#OR
+library('plyr')
+count(course_topics)
+#OR
+library('vctrs')
+vec_count(course_topics)
+vec_count(course_topics, sort = "key")
+#OR
+as.data.frame(table(course_topics))
+
+###########################################################################
+#4 b)	Generate rules with highest lift and supp= 0.01, conf = 0.1
+###########################################################################
+library(arules)
+library(arulesViz)
+library(RColorBrewer)
+rules <- apriori(course_topics, parameter = list(supp = 0.01, conf = 0.1))
+#Rules generated are 1024 
+
+#using inspect() to see first 10 rules
+inspect(rules[1:10])
+###########################################################################
+#4 c)	Generate rules with highest lift and supp= 0.01, conf = 0.1 and 0.5
+###########################################################################
+library(arules)
+library(arulesViz)
+library(RColorBrewer)
+rules1 <- apriori(course_topics, parameter = list(supp = 0.01, conf = 0.5))
+#Rules generated are 1024 
+
+#using inspect() to see first 10 rules
+inspect(rules1[1:10])
+
+###########################################################################
+#5. b
+###########################################################################
+library(mlba)
+housing.df <- mlba::BostonHousing
+
+#linear regression model
+modelforhousing <- lm(MEDV ~ CRIM + CHAS + RM, data = housing.df)
+summary(modelforhousing)
+
+###########################################################################
+#5. c
+###########################################################################
+intercept <- coef(modelforhousing)[1] #-28.81068
+coef_CRIM <- coef(modelforhousing)[2] #0.2607244
+coef_CHAS <- coef(modelforhousing)[3] #3.763037
+coef_RM <- coef(modelforhousing)[4] #8.27818
+
+CRIM <- 0.1
+CHAS <- 0
+RM <- 6
+
+#not working
+predicted_tract_MEDV <- intercept + coef_CRIM * CRIM + coef_CHAS * CHAS + coef_RM * RM
+
+###########################################################################
+#5. d. Create a correlation matrix of INDUS, NOX, and TAX. Interpret the result
+###########################################################################
+#INDUS NOX TAX subset from boston housing dataset
+subset_housing.df <- housing.df[, c("INDUS", "NOX", "TAX")]
+#correlation matrix
+correlation_matrix <- cor(subset_housing.df)
+correlation_matrix
+
+###########################################################################
+#5. e. Create a Correlation Matrix and identify correlated predictors (use all predictors except CHAS)
+###########################################################################
+#Exclude CHAS in new subset of boston housing
+subset_housing.df_excludeCHAS <- housing.df[, !names(housing.df) %in% "CHAS"]
+#correlation matrix
+corr_matrix <- cor(subset_housing.df_excludeCHAS)
+corr_matrix
+
+###########################################################################
+#5. f.  Build the model using all attributes except CHAS, INDUS, and AGE
+###########################################################################
+library(dplyr)
+#data without CHAS, INDUS, AGE
+subset_exceptCHASINDUSAGE <- housing.df %>%
+  select(-CHAS, -INDUS, -AGE)
+subset_exceptCHASINDUSAGE
+set.seed(2023)
+
+#CRIM as target var
+idx1 <- caret::createDataPartition(housing.df$CRIM, p=0.6, list=FALSE)
+train_H.df <- housing.df[idx1,]
+holdout_H.df <- housing.df[-idx1,]
+
+#model creation
+reg1 <- lm(CRIM~., data=train_H.df)
+
+pred_train <- predict(reg1)
+pred_hold <- predict(reg1, newdata=holdout_H.df)
+###########################################################################
+#5. g. Run the model on holdout and display the accuracy.
+###########################################################################
+#model on holdout
+reg2 <- lm(CRIM~., data=holdout_H.df)
+summary(reg2)
+accuracy(reg2)
+
+
+## evaluate performance
+# training
+caret::RMSE(pred_train, train.df$CRIM)
+# holdout
+caret::RMSE(pred_hold, holdout.df$CRIM)

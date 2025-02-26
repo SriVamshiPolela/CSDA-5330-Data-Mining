@@ -1,0 +1,160 @@
+
+# Figure 5.1 PREDICTION ERROR METRICS FROM A MODEL FOR TOYOTA CAR PRICES. TRAINING AND HOLDOUT
+# The tidyverse is a collection of R packages designed to work together for data manipulation, visualization, and analysis. 
+library(tidyverse)
+set.seed(1)
+
+# Load the ToyotaCorolla dataset, drop columns "Id", "Model", "Fuel_Type", "Color", and remove rows with missing values
+car.df <- mlba::ToyotaCorolla %>%
+  select(-one_of("Id", "Model", "Fuel_Type", "Color")) %>%
+  drop_na()
+
+# Randomly split data into a training set (60%) and a holdout set
+idx <- caret::createDataPartition(car.df$Price, p=0.6, list=FALSE)
+train.df <- car.df[idx,]
+holdout.df <- car.df[-idx,]
+
+# Perform linear regression modeling using the training data
+reg <- lm(Price ~ ., data=train.df)
+pred_t <- predict(reg)  # Predictions for the training set
+pred_h <- predict(reg, newdata=holdout.df)  # Predictions for the holdout set
+
+## Evaluate model performance using Root Mean Squared Error (RMSE)
+# RMSE for the training set
+caret::RMSE(pred_t, train.df$Price)
+
+# RMSE for the holdout set
+caret::RMSE(pred_h, holdout.df$Price)
+
+# Use utility function from the mlba package to calculate various regression metrics for training and holdout sets
+rbind(
+  Training=mlba::regressionSummary(pred_t, train.df$Price),
+  Holdout=mlba::regressionSummary(pred_h, holdout.df$Price)
+)
+
+
+#FIGURE 5.2 CUMULATIVE GAINS CHART (LEFT) AND DECILE LIFT CHART (RIGHT) FOR CONTINUOUS OUTCOME VARIABLE (SALES OF TOYOTA CARS)
+
+# Load necessary libraries
+library(ggplot2)
+library(gridExtra)
+
+# Install and load the gains package
+install.packages("gains")
+library(gains)
+
+# Extract price and predictions for holdout data
+price <- holdout.df$Price
+pred_h <- predict(reg, newdata = holdout.df)
+
+# Compute gains
+gain <- gains(price, pred_h)
+
+# Cumulative lift chart
+# Prepare data for the cumulative gains chart
+df_cumulative <- data.frame(
+  ncases = c(0, gain$cume.obs),
+  cumPrice = c(0, gain$cume.pct.of.total * sum(price))
+)
+
+# Create the cumulative gains chart plot (g1)
+g1 <- ggplot(df_cumulative, aes(x = ncases, y = cumPrice)) +
+  geom_line() +
+  geom_line(data = data.frame(ncases = c(0, nrow(holdout.df)), cumPrice = c(0, sum(price))),
+            color = "gray", linetype = 2) +  # Adds baseline
+  labs(x = "# Cases", y = "Cumulative Price", title = "Cumulative Gains Chart") +
+  scale_y_continuous(labels = scales::comma)
+
+# Decile-wise lift chart
+# Prepare data for the decile-wise lift chart
+df_decile <- data.frame(
+  percentile = gain$depth,
+  meanResponse = gain$mean.resp / mean(price)
+)
+
+# Create the decile-wise lift chart plot (g2)
+g2 <- ggplot(df_decile, aes(x = percentile, y = meanResponse)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Percentile", y = "Decile mean / global mean", title = "Decile-wise Lift Chart")
+
+# Arrange the two plots side by side
+grid.arrange(g1, g2, ncol = 2)
+# Explanation
+#Based on a linear regression model fitted to Toyota data, 
+#a cumulative gains chart and decile lift chart were generated using holdout data of 573 cars. 
+#The cumulative gains curve of the model outperformed the baseline, indicating better predictive performance. 
+#These charts are valuable for scenarios like selecting the top 10% of cars with the highest predicted sales. 
+#By doing so, revenue could increase by 1.85 times compared to a random selection. 
+#This lift is evident from the cumulative gains chart: comparing sales of 57 randomly selected cars ($619,401) with the top 57 cars based on predicted values ($1,137,362). This ratio is 1.85.
+
+#FIGURE 5.5 ROC CURVE FOR RIDING‐MOWERS EXAMPLE
+install.packages("ROCR")
+library(ROCR)
+predob <- prediction(df$prob, df$actual)
+perf <- performance(predob, "tpr", "fpr")
+perf.df <- data.frame(
+  tpr=perf@x.values[[1]],
+  fpr=perf@y.values[[1]]
+)
+ggplot(perf.df, aes(x=tpr, y=fpr)) +
+  geom_line() +
+  geom_segment(aes(x=0, y=0, xend=1, yend=1), color="grey", linetype="dashed") +
+  labs(x="1 - Specificity", y="Sensitivity")
+
+# get the AUC value
+performance(predob, measure="auc")@y.values[[1]]
+
+
+# Explanation:
+#Precision measures classifier accuracy for positive class members. 
+#It's the ratio of correctly classified positives to all classified positives. 
+#It complements recall (sensitivity), and they often trade off. F1-score combines precision and recall, plotted against thresholds for tradeoff analysis. 
+#The ROC curve using 'ROCR' library visualizes sensitivity and specificity tradeoffs, with AUC quantifying performance.
+
+#FIGURE 5.7 CUMULATIVE GAINS CHARTS FOR THE MOWER EXAMPLE USING ROCR, CARET, AND GAINS PACKAGES (LEFT TO RIGHT)
+# Load necessary libraries and load LiftExample data
+df <- mlba::LiftExample %>%
+  mutate(actual = relevel(factor(actual), ref = "1"))  # Make 'actual' a factor with reference class 1
+
+# Option 1: 'ROCR' library
+# Create prediction object and calculate performance
+pred <- prediction(df$prob, df$actual)
+perf <- performance(pred, "tpr", "rpp")
+
+# Create the cumulative lift chart plot (Option 1)
+plot(perf, xlab = "Ratio of cases", ylab = "Ratio of samples found")
+lines(c(0, 1), c(0, 1), lty = 'dashed')  # Adds baseline
+
+# Option 2: 'caret' library
+# Create lift chart using the 'caret' library (Option 2)
+lift.example <- caret::lift(actual ~ prob, data = df)
+ggplot(lift.example, plot = "gain") +
+  labs(x = "# Samples tested", y = "# Samples found")
+
+# Option 3: 'gains' library
+# Load 'gains' library and LiftExample data
+library(gains)
+df <- mlba::LiftExample
+
+# Calculate gains
+gain <- gains(df$actual, df$prob, groups = nrow(df))
+
+# Prepare data for the cumulative lift chart
+result <- data.frame(
+  ncases = c(0, gain$cume.obs),
+  cumulative = sum(df$actual) * c(0, gain$cume.pct.of.total)
+)
+
+# Create the cumulative lift chart plot (Option 3)
+ggplot(result, aes(x = ncases, y = cumulative)) +
+  geom_line() +
+  geom_segment(aes(x = 0, y = 0, xend = nrow(df), yend = sum(df$actual)),
+               color = "gray", linetype = 2) +  # Adds baseline
+  labs(x = "# Cases", y = "# Samples found")
+# Explanation:
+#The code generates cumulative lift charts using three different libraries to assess a predictive model's performance. 
+#LiftExample data is used, with the 'actual' class converted to a factor. The charts show how much better the model performs compared to random assignment at different record counts. 
+#The lift, indicating the model's ability to detect class members, varies with the number of records acted upon. 
+#Targeting the top 10 records yields a lift of about 1.8, demonstrating the model's significant improvement over random selection in detecting class 1 members, particularly when focusing on fewer records.
+
+

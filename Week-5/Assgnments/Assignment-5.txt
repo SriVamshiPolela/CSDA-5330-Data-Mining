@@ -1,0 +1,157 @@
+# Assignment-5 ***********
+# Question-1
+#a.What is the target attribute?
+# Dependent variable or predictive variable which is Result in this dataset
+#b.What are classifier attributes?
+# Independent variable or predictors are Income and Family_Size
+
+# Read the file
+vacationtrip<-read.csv("vacation-trip-classification.csv")
+summary(vacationtrip$Result)
+
+#Data Partitioning
+library(caret)
+set.seed(2015)
+Samp_data<-createDataPartition(vacationtrip$Result, p=0.7, list = FALSE)
+train<-vacationtrip[Samp_data,]
+test<-vacationtrip[-Samp_data,]
+
+#Building Tree (on training dataset):
+#install.packages("rpart")
+library(rpart)
+vacationtrip.tree<-rpart(Result ~ ., data = train, control = rpart.control(minsplit=2, cp=0))
+
+#Visualizing Tree:
+#install.packages("rpart.plot")
+library(rpart.plot)
+prp(vacationtrip.tree, type = 2, extra = 104, nn = TRUE, fallen.leaves = TRUE, faclen = 4, varlen = 8, shadow.col = "green")
+
+# Predicting Training and Test Dataset and Create CM:
+pred.train<-predict(vacationtrip.tree, train, type="class")
+conf_matrix_train <- table(train$Result,pred.train, dnn=c("Actual", "Predicted"))
+print(conf_matrix_train)
+pred.test<-predict(vacationtrip.tree, test, type="class")
+conf_matrix_test <- table(test$Result, pred.test, dnn=c("Actual", "Predicted"))
+print(conf_matrix_test)
+
+# Calculate Accuracy, Sensitivity, and Specificity
+accuracy <- sum(diag(conf_matrix_test)) / sum(conf_matrix_test)
+specificity <- conf_matrix_test[2, 2] / sum(conf_matrix_test[2, ])
+sensitivity <- conf_matrix_test[1, 1] / sum(conf_matrix_test[1, ])
+
+cat("Accuracy:", accuracy)
+cat("specificity:", specificity)
+cat("sensitivity:", sensitivity)
+
+# Building a Larger Tree
+vacationtrip.tree.B<-rpart(Result ~ ., data = train, control = rpart.control(minsplit = 10, cp=0))
+prp(vacationtrip.tree.B, type = 2, extra = 104, nn = TRUE, fallen.leaves = TRUE, faclen = 4, varlen = 8, shadow.col = "red")
+
+#Pruning Tree
+printcp(vacationtrip.tree.B)
+plotcp(vacationtrip.tree.B) #(Visualize the complexity parameters)
+vacationtrip.tree.B.Pruned<-prune(vacationtrip.tree.B, 0.018)
+#By pruning the tree with an appropriate cp value, you can obtain a more balanced and interpretable decision tree model that is less #likely to overfit the training data.
+# Visualizing Tree
+prp(vacationtrip.tree.B.Pruned, type = 2, extra = 104, nn = TRUE, fallen.leaves = TRUE, faclen = 4, varlen = 8, shadow.col = "gray")
+
+# Apply the model to new data
+new_data <- read.csv("New vacation-trip.csv")
+new_data$Predicted_Result <- predict(vacationtrip.tree, new_data, type = "class")
+new_data
+# Write the predicted values to new dataset 
+write.csv(new_data, "New vacation-trip.csv", row.names = FALSE)
+
+**************************************************************************************************************************
+# Question-2
+library(caret)
+# Load the rpart library
+library(rpart)
+library(rpart.plot)
+# Load the dataset
+carseats <- read.csv("carseats.csv")
+
+# It will Display the structure of the dataset means the datatype of each variable 
+str(carseats)
+
+# Display summary statistics of the numeric variables
+summary(carseats)
+
+# Create the binary response variable High_Sales
+carseats$High_Sales <- ifelse(carseats$Sales > 8, "High", "Not High")
+head(carseats)
+# Box plot of Sales by ShelveLoc
+boxplot(Sales ~ ShelveLoc, data = carseats, ylab = "Sales")
+
+# Histogram of Income
+hist(carseats$Income, main = "Income Distribution")
+
+# Split the data into training (70%) and testing (30%) sets
+set.seed(2023)  # For reproducibility
+carseats_partition <- createDataPartition(carseats$High_Sales, p=0.7, list = FALSE)
+train_data <- carseats[carseats_partition, ]
+test_data <- carseats[-carseats_partition, ]
+
+
+# Build the decision tree model
+tree_model <- rpart(High_Sales ~ ., data = train_data, method = "class")
+
+# Make predictions on the test data
+predictions <- predict(tree_model, test_data, type = "class")
+predictions.head()
+# Create a confusion matrix
+confusion_matrix <- table(test_data$High_Sales, predictions, dnn=c("Actual", "Predicted"))
+
+# Display the confusion matrix
+confusion_matrix
+
+# The model accuracy is 100% 
+
+# Visualize the decision tree
+prp(tree_model, type = 2, extra = 101, fallen.leaves = TRUE)
+
+#accuracy, sensitivity, and specificity from the confusion matrix
+accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
+sensitivity <- confusion_matrix[1, 1] / sum(confusion_matrix[1, ])
+specificity <- confusion_matrix[2, 2] / sum(confusion_matrix[2, ])
+
+
+# Print 
+cat("Accuracy:", round(accuracy, 2), "\n")
+cat("Sensitivity (True Positive Rate):", round(sensitivity, 2), "\n")
+cat("Specificity (True Negative Rate):", round(specificity, 2), "\n")
+
+
+#It correctly predicted all instances of "High" sales.
+#It also correctly predicted all instances of "Not High" sales.
+#As a result, both sensitivity (True Positive Rate) and specificity (True Negative Rate) are 100%, and the model achieved a perfect accuracy of 100%
+*********************************************************************************************************************************************************************
+# Question 3
+
+library(caret)
+# Load the rpart library
+library(rpart)
+library(rpart.plot)
+# Load the dataset
+Wine.df <- read.csv("Wine.csv")
+set.seed(2023)
+Wine_partition <- createDataPartition(Wine.df$Type, p=0.7, list=FALSE )
+train.df<-Wine.df[Wine_partition,]
+test.df<-Wine.df[-Wine_partition,]
+# Build the model using rpart
+model<-rpart(Type ~., data=train.df, method="class")
+# Predict the model using test data 
+Predict_model <- predict(model, test.df, type = "class")
+# Create confusion matrix 
+confusion_matrix <- table(test.df$Type, Predict_model, dnn=c("Actual", "Predicted"))
+confusion_matrix
+
+# Calculate Accuracy
+accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
+
+accuracy
+#The accuracy calculated from confusion matrix is approximately 0.846 or 84.6%. 
+#This means that the model correctly classified 84.6% of the instances in the validation dataset.
+
+
+
